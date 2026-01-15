@@ -3,6 +3,41 @@
 **Automated scene classification and matching model recommendation system for 3D reconstruction pipelines.**
 
 ---
+# Downloading Videos from ARKitScenes
+
+> **Dataset Source:** [Apple ARKitScenes on GitHub](https://github.com/apple/ARKitScenes)
+
+## Step 1: Clone the repository
+
+```bash
+git clone https://github.com/apple/ARKitScenes.git
+cd ARKitScenes
+```
+
+## Step 2: View available video IDs
+
+Check `raw/raw_train_val_splits.csv` for a list of all video IDs and their splits (Training/Validation).
+
+## Step 3: Download videos
+
+```bash
+# Single video
+python3 download_data.py raw --video_id 40753679 --download_dir ./data
+
+# Multiple videos
+python3 download_data.py raw --video_id 40753679 41007548 41048068 --download_dir ./data
+
+# All Training videos (large download!)
+python3 download_data.py raw --split Training --download_dir ./data
+```
+
+## Step 4: Verify
+
+Videos are saved to:
+```
+data/Training/<video_id>/<video_id>.mov
+data/Validation/<video_id>/<video_id>.mov
+```
 
 ## 🎯 What It Does
 
@@ -597,6 +632,7 @@ lsof -ti:8080 | xargs kill -9
 ```
 
 ---
+
 
 ## 📜 License
 
