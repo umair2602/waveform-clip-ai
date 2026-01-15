@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLIP Scene Classifier</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">🎯 CLIP Scene Classifier</h1>
+                <p class="subtitle">AI-powered image scene classification using OpenAI's CLIP</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📷</div>
+                    <h2>Drop an image here or click to upload</h2>
+                    <p class="upload-hint">Supports: JPG, PNG, GIF, BMP, WebP, TIFF • Select one or multiple images</p>
+                    <input type="file" id="fileInput" accept="image/*" multiple hidden>
+                    <button class="btn-primary" id="uploadBtn">Choose Image</button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="loading-section hidden" id="loadingSection">
+                <div class="loader"></div>
+                <p>Analyzing image with CLIP...</p>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section hidden" id="resultsSection">
+                <div class="results-grid">
+                    <!-- Image Preview -->
+                    <div class="image-preview">
+                        <h3>Uploaded Image</h3>
+                        <div class="image-container">
+                            <img id="previewImage" alt="Uploaded image">
+                        </div>
+                    </div>
+
+                    <!-- Classification Results -->
+                    <div class="classification-results">
+                        <h3>Classification Results</h3>
+
+                        <!-- Top Prediction -->
+                        <div class="top-prediction">
+                            <div class="prediction-label">Top Prediction</div>
+                            <div class="prediction-type" id="topType"></div>
+                            <div class="prediction-description" id="topDescription"></div>
+                            <div class="confidence-badge" id="topConfidence"></div>
+                        </div>
+
+                        <!-- All Predictions -->
+                        <div class="all-predictions">
+                            <h4>All Scene Types</h4>
+                            <div id="allPredictions"></div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="actions">
+                            <button class="btn-primary" id="newImageBtn">Classify Another Image</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Section -->
+            <div class="error-section hidden" id="errorSection">
+                <div class="error-icon">⚠️</div>
+                <h3>Oops! Something went wrong</h3>
+                <p id="errorMessage"></p>
+                <button class="btn-primary" id="retryBtn">Try Again</button>
+            </div>
+        </main>
+
+        <!-- Scene Types Info -->
+        <section class="info-section">
+            <h3>📖 Scene Type Definitions</h3>
+            <div class="scene-types-grid">
+                <div class="scene-type-card">
+                    <div class="scene-icon">🏠</div>
+                    <h4>Indoor Small</h4>
+                    <p>Small enclosed spaces like bedrooms, office cubicles, closets</p>
+                </div>
+                <div class="scene-type-card">
+                    <div class="scene-icon">🏢</div>
+                    <h4>Indoor Large</h4>
+                    <p>Large spaces with many objects like warehouses, workshops</p>
+                </div>
+                <div class="scene-type-card">
+                    <div class="scene-icon">🌳</div>
+                    <h4>Outdoor</h4>
+                    <p>Exterior scenes like streets, parks, parking lots</p>
+                </div>
+                <div class="scene-type-card">
+                    <div class="scene-icon">🔍</div>
+                    <h4>Close-up</h4>
+                    <p>Macro shots showing fine detail and texture (&lt;1m)</p>
+                </div>
+                <div class="scene-type-card">
+                    <div class="scene-icon">🏔️</div>
+                    <h4>Far-away</h4>
+                    <p>Distant objects like buildings, mountains (&gt;15m)</p>
+                </div>
+                <div class="scene-type-card">
+                    <div class="scene-icon">✨</div>
+                    <h4>Glass/Shiny</h4>
+                    <p>Reflective surfaces like windows, mirrors, polished metal</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by OpenAI CLIP • Built for 3D Reconstruction Pipeline Optimization</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+
+</html>

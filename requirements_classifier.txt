@@ -1,0 +1,17 @@
+# Python dependencies for CLIP Scene Classifier
+
+# Core CLIP dependencies
+torch>=1.7.1
+torchvision>=0.8.2
+ftfy
+regex
+tqdm
+Pillow
+
+# Web interface
+flask>=2.0.0
+werkzeug>=2.0.0
+
+# Optional: For better performance
+# Install CLIP from GitHub:
+# pip install git+https://github.com/openai/CLIP.git
