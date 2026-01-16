@@ -12,6 +12,7 @@ import os
 import base64
 from io import BytesIO
 from PIL import Image
+import cv2
 from scene_classifier import SceneClassifier
 
 app = Flask(__name__)
@@ -19,7 +20,9 @@ app = Flask(__name__)
 # Configuration
 UPLOAD_FOLDER = Path('uploads')
 UPLOAD_FOLDER.mkdir(exist_ok=True)
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff'}
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff'}
+ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'}
+ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | ALLOWED_VIDEO_EXTENSIONS
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max for batch uploads
@@ -40,6 +43,61 @@ def image_to_base64(image_path):
     """Convert image to base64 for display in browser."""
     with open(image_path, 'rb') as img_file:
         return base64.b64encode(img_file.read()).decode('utf-8')
+
+
+def is_video_file(filename):
+    """Check if file is a video."""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
+
+
+def extract_frames_from_video(video_path, num_frames=10):
+    """
+    Extract frames from a video file.
+    
+    Args:
+        video_path: Path to the video file
+        num_frames: Number of frames to extract (evenly spaced)
+        
+    Returns:
+        List of (frame_path, frame_number) tuples
+    """
+    cap = cv2.VideoCapture(str(video_path))
+    
+    if not cap.isOpened():
+        raise ValueError(f"Cannot open video: {video_path}")
+    
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    duration = total_frames / fps if fps > 0 else 0
+    
+    # Calculate frame indices to extract (evenly spaced)
+    if total_frames <= num_frames:
+        frame_indices = list(range(total_frames))
+    else:
+        frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
+    
+    extracted_frames = []
+    video_name = Path(video_path).stem
+    
+    for idx, frame_idx in enumerate(frame_indices):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = cap.read()
+        
+        if ret:
+            # Save frame as temporary image
+            frame_path = UPLOAD_FOLDER / f"{video_name}_frame_{idx:03d}.jpg"
+            cv2.imwrite(str(frame_path), frame)
+            extracted_frames.append((str(frame_path), frame_idx))
+    
+    cap.release()
+    
+    return extracted_frames, {
+        'total_frames': total_frames,
+        'fps': fps,
+        'duration': duration,
+        'extracted_count': len(extracted_frames)
+    }
 
 
 @app.route('/')
@@ -210,6 +268,120 @@ def classify_batch():
     
     except Exception as e:
         return jsonify({'error': f'Batch classification failed: {str(e)}'}), 500
+
+
+@app.route('/api/classify-video', methods=['POST'])
+def classify_video():
+    """API endpoint to classify frames from uploaded video."""
+    # Check if file was uploaded
+    if 'video' not in request.files:
+        return jsonify({'error': 'No video file provided'}), 400
+    
+    file = request.files['video']
+    
+    # Check if file was selected
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Check if file type is allowed
+    if not is_video_file(file.filename):
+        return jsonify({'error': 'Invalid file type. Allowed: ' + ', '.join(ALLOWED_VIDEO_EXTENSIONS)}), 400
+    
+    try:
+        # Get number of frames from request (default: 10)
+        num_frames = int(request.form.get('num_frames', 10))
+        num_frames = min(max(num_frames, 1), 50)  # Limit between 1-50
+        
+        # Save uploaded video
+        filename = secure_filename(file.filename)
+        video_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(video_path)
+        
+        # Extract frames
+        frames, video_info = extract_frames_from_video(video_path, num_frames)
+        
+        if not frames:
+            os.remove(video_path)
+            return jsonify({'error': 'Could not extract frames from video'}), 400
+        
+        # Classify each frame
+        results = []
+        scene_counts = {}
+        
+        for frame_path, frame_idx in frames:
+            # Classify
+            classifications = classifier.classify_image(frame_path)
+            top_type, top_conf = classifier.get_top_prediction(frame_path)
+            
+            # Count scene types
+            scene_counts[top_type] = scene_counts.get(top_type, 0) + 1
+            
+            # Convert frame to base64 for display
+            image_data = image_to_base64(frame_path)
+            
+            results.append({
+                'frame_index': frame_idx,
+                'timestamp': frame_idx / video_info['fps'] if video_info['fps'] > 0 else 0,
+                'image': f'data:image/jpeg;base64,{image_data}',
+                'scene_type': top_type,
+                'confidence': round(top_conf, 2),
+                'all_predictions': {
+                    scene: round(conf, 2) 
+                    for scene, conf in classifications.items()
+                }
+            })
+            
+            # Clean up frame
+            os.remove(frame_path)
+        
+        # Clean up video
+        os.remove(video_path)
+        
+        # Calculate summary
+        total_frames = len(results)
+        scene_distribution = {
+            scene: (count / total_frames) * 100 
+            for scene, count in scene_counts.items()
+        }
+        
+        # Get dominant scenes
+        dominant_scenes = [
+            scene for scene, pct in scene_distribution.items() 
+            if pct > 20
+        ]
+        
+        if not dominant_scenes:
+            dominant_scenes = sorted(
+                scene_distribution.items(), 
+                key=lambda x: x[1], 
+                reverse=True
+            )[:2]
+            dominant_scenes = [scene for scene, _ in dominant_scenes]
+        
+        # Recommend models for dominant scenes
+        recommended_models = []
+        for scene in dominant_scenes:
+            model = classifier.get_model_recommendation(scene)
+            recommended_models.append({
+                'scene_type': scene,
+                'model': model,
+                'percentage': round(scene_distribution[scene], 1)
+            })
+        
+        return jsonify({
+            'success': True,
+            'video_info': video_info,
+            'results': results,
+            'summary': {
+                'total_frames': total_frames,
+                'scene_distribution': scene_distribution,
+                'dominant_scenes': dominant_scenes,
+                'recommended_models': recommended_models
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'Video classification failed: {str(e)}'}), 500
 
 
 @app.route('/api/scene-types', methods=['GET'])

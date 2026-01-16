@@ -88,102 +88,102 @@ class SceneClassifier:
             "primary": {
                 "name": "LightGlue",
                 "speed": "fast",
-                "reason": "Excellent speed/accuracy for indoor scenes with abundant close-range features"
+                "reason": "Excellent speed–accuracy tradeoff for indoor scenes with sufficient local features when paired with a learned detector"
             },
             "alternative": {
                 "name": "SuperGlue",
                 "speed": "medium",
-                "reason": "Better for low-texture indoor areas with complex geometry"
+                "reason": "More robust matching under clutter and partial occlusion given reliable keypoints"
             },
-            "fast_option": {
+            "fallback": {
                 "name": "SIFT",
-                "speed": "fast",
-                "reason": "Reliable traditional fallback for simple indoor matching"
+                "speed": "slow",
+                "reason": "Stable classical fallback for simple indoor scenes when learning-based methods fail"
             }
         },
         "indoor_large": {
             "primary": {
                 "name": "SuperGlue",
                 "speed": "medium",
-                "reason": "Robust to clutter and occlusions in complex environments"
+                "reason": "Robust graph-based matching for large indoor environments with clutter and occlusions"
             },
             "alternative": {
                 "name": "OmniGlue",
                 "speed": "medium",
-                "reason": "Handles complex occlusions and varied depths well"
+                "reason": "General-purpose matcher designed for heterogeneous and challenging indoor layouts"
             },
             "dense_option": {
                 "name": "DUSt3R",
                 "speed": "medium",
-                "reason": "Dense reconstruction for complete scene coverage"
+                "reason": "Dense correspondence and geometry reasoning for full-scene indoor reconstruction"
             }
         },
         "outdoor": {
             "primary": {
                 "name": "XFeat",
                 "speed": "fast",
-                "reason": "Scale-invariant and robust to lighting changes"
+                "reason": "Strong scale and illumination robustness for outdoor imagery"
             },
             "alternative": {
-                "name": "xfeat+lightglue",
+                "name": "XFeat+LightGlue",
                 "speed": "fast",
-                "reason": "Enhanced accuracy for outdoor scenes with wide baselines"
+                "reason": "Improved matching accuracy for wide-baseline outdoor scenes"
             },
             "dense_option": {
                 "name": "DUSt3R",
                 "speed": "medium",
-                "reason": "Dense matching for large outdoor scenes"
+                "reason": "Dense matching suitable for large-scale outdoor geometry"
             }
         },
         "close_up": {
             "primary": {
                 "name": "DISK",
                 "speed": "slow",
-                "reason": "Dense features capture high texture detail in macro shots"
+                "reason": "Learned keypoints emphasize fine-grained texture and local detail in close-range imagery"
             },
             "alternative": {
                 "name": "LightGlue",
                 "speed": "fast",
-                "reason": "Fast matching for texture-rich close-up scenes"
+                "reason": "Fast and accurate matching for texture-rich close-up scenes"
             },
             "detail_option": {
                 "name": "DeDoDe",
                 "speed": "medium",
-                "reason": "Captures fine details in close-up imagery"
+                "reason": "Specialized in capturing very fine visual details and subtle structures"
             }
         },
         "far_away": {
             "primary": {
                 "name": "SIFT",
-                "speed": "fast",
-                "reason": "Robust scale invariance for distant, low-texture objects"
+                "speed": "slow",
+                "reason": "Strong scale invariance and robustness for distant objects with limited texture"
             },
             "alternative": {
                 "name": "XoFTR",
                 "speed": "medium",
-                "reason": "Handles low-texture distant features well"
+                "reason": "Dense matching can help in low-texture distant scenes when sufficient geometric overlap exists"
             },
             "sparse_option": {
                 "name": "RDD(sparse)",
                 "speed": "medium",
-                "reason": "Efficient sparse matching for distant objects"
+                "reason": "Efficient sparse matching for long-range scenes with limited overlap"
             }
         },
         "glass_shiny": {
             "primary": {
-                "name": "XoFTR",
-                "speed": "medium",
-                "reason": "Handles geometric transforms from reflections and distortions"
+                "name": "Mast3R",
+                "speed": "slow",
+                "reason": "3D-aware correspondence reasoning partially mitigates failures caused by reflections and specular surfaces"
             },
             "alternative": {
                 "name": "RIPE",
                 "speed": "medium",
-                "reason": "Robust to specular reflections and glare"
+                "reason": "Designed to be more tolerant to specular highlights, though geometric reliability is still limited"
             },
-            "specialized": {
-                "name": "Mast3R",
-                "speed": "slow",
-                "reason": "3D-aware matching handles complex reflection distortions"
+            "warning": {
+                "name": "XoFTR",
+                "speed": "medium",
+                "reason": "May produce matches on reflective surfaces, but results are not geometrically reliable due to epipolar violations"
             }
         }
     }

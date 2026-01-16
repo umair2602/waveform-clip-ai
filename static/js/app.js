@@ -57,7 +57,10 @@ document.addEventListener('DOMContentLoaded', function () {
         e.stopPropagation();
         uploadArea.classList.remove('drag-over');
 
-        const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+        // Accept both images and videos
+        const files = Array.from(e.dataTransfer.files).filter(file =>
+            file.type.startsWith('image/') || file.type.startsWith('video/')
+        );
         if (files.length > 0) {
             handleFiles(files);
         }
@@ -73,20 +76,41 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function handleFiles(files) {
-        // Validate all files
-        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp', 'image/tiff'];
-        const validFiles = [];
+        // Define valid types
+        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp', 'image/tiff'];
+        const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm', 'video/x-m4v'];
+        const validVideoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'];
 
-        for (const file of files) {
-            if (!validTypes.includes(file.type)) {
-                showError(`Invalid file type for "${file.name}". Please upload image files only.`);
+        // Check if it's a video file
+        const file = files[0];
+        const extension = file.name.split('.').pop().toLowerCase();
+        const isVideo = validVideoTypes.includes(file.type) || validVideoExtensions.includes(extension);
+
+        if (isVideo) {
+            // Handle video file
+            if (file.size > 100 * 1024 * 1024) {
+                showError(`Video "${file.name}" is too large. Maximum size is 100MB.`);
                 return;
             }
-            if (file.size > 16 * 1024 * 1024) {
-                showError(`File "${file.name}" is too large. Maximum size is 16MB.`);
+            uploadAndClassifyVideo(file);
+            return;
+        }
+
+        // Handle image files
+        const validFiles = [];
+        for (const f of files) {
+            const ext = f.name.split('.').pop().toLowerCase();
+            const isImage = validImageTypes.includes(f.type) || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff'].includes(ext);
+
+            if (!isImage) {
+                showError(`Invalid file type for "${f.name}". Please upload image or video files.`);
                 return;
             }
-            validFiles.push(file);
+            if (f.size > 16 * 1024 * 1024) {
+                showError(`File "${f.name}" is too large. Maximum size is 16MB.`);
+                return;
+            }
+            validFiles.push(f);
         }
 
         // If single image, use single classification
@@ -120,6 +144,40 @@ document.addEventListener('DOMContentLoaded', function () {
                     displayResults(data);
                 } else {
                     showError(data.error || 'Classification failed. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('Network error. Please check your connection and try again.');
+            });
+    }
+
+    function uploadAndClassifyVideo(file) {
+        // Show loading state
+        uploadSection.classList.add('hidden');
+        loadingSection.classList.remove('hidden');
+        resultsSection.classList.add('hidden');
+        errorSection.classList.add('hidden');
+
+        // Update loading text
+        loadingSection.querySelector('p').textContent = `Extracting and analyzing frames from video...`;
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('num_frames', '10');  // Extract 10 frames
+
+        // Send to backend
+        fetch('/api/classify-video', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayVideoResults(data);
+                } else {
+                    showError(data.error || 'Video classification failed. Please try again.');
                 }
             })
             .catch(error => {
@@ -311,6 +369,111 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('newBatchBtn').addEventListener('click', resetUI);
     }
 
+    function displayVideoResults(data) {
+        // Hide loading
+        loadingSection.classList.add('hidden');
+        resultsSection.classList.add('hidden');
+
+        // Create or get video results container
+        let videoContainer = document.getElementById('videoResults');
+        if (!videoContainer) {
+            videoContainer = document.createElement('div');
+            videoContainer.id = 'videoResults';
+            videoContainer.className = 'batch-results';
+            resultsSection.parentNode.insertBefore(videoContainer, resultsSection);
+        }
+
+        videoContainer.classList.remove('hidden');
+        videoContainer.innerHTML = '';
+
+        // Video info and summary
+        const summary = data.summary;
+        const videoInfo = data.video_info;
+
+        const formatTime = (seconds) => {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        };
+
+        const summaryHTML = `
+            <div class="dataset-summary">
+                <h2>🎬 Video Analysis</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${summary.total_frames}</div>
+                        <div class="stat-label">Frames Analyzed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${formatTime(videoInfo.duration)}</div>
+                        <div class="stat-label">Duration</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${videoInfo.fps.toFixed(1)}</div>
+                        <div class="stat-label">FPS</div>
+                    </div>
+                </div>
+
+                <h3>Scene Distribution</h3>
+                <div class="distribution-chart">
+                    ${Object.entries(summary.scene_distribution)
+                .sort((a, b) => b[1] - a[1])
+                .map(([scene, pct]) => `
+                            <div class="scene-bar">
+                                <span class="scene-label">${formatSceneType(scene)}</span>
+                                <div class="bar">
+                                    <div class="bar-fill" style="width: ${pct}%"></div>
+                                </div>
+                                <span class="pct">${pct.toFixed(1)}%</span>
+                            </div>
+                        `).join('')}
+                </div>
+
+                <h3>🎯 Recommended Matching Models</h3>
+                <div class="models-list">
+                    ${summary.recommended_models.map(rec => `
+                        <div class="model-recommendation">
+                            <div class="model-card">
+                                <div class="model-header">
+                                    <span class="model-name">${rec.model.name}</span>
+                                    <span class="model-speed speed-${rec.model.speed}">${rec.model.speed}</span>
+                                </div>
+                                <div class="model-reason">
+                                    For ${formatSceneType(rec.scene_type)} scenes (${rec.percentage}% of video): ${rec.model.reason}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="images-grid-section">
+                <h3>Frame Analysis (${data.results.length} frames)</h3>
+                <div class="images-grid">
+                    ${data.results.map(frame => `
+                        <div class="grid-item" title="Frame ${frame.frame_index} @ ${formatTime(frame.timestamp)}">
+                            <img src="${frame.image}" alt="Frame ${frame.frame_index}">
+                            <div class="grid-label">
+                                <strong>${formatSceneType(frame.scene_type)}</strong>
+                                <span>${frame.confidence.toFixed(1)}%</span>
+                            </div>
+                            <div class="frame-time">${formatTime(frame.timestamp)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-primary" id="newVideoBtn">Analyze Another Video</button>
+            </div>
+        `;
+
+        videoContainer.innerHTML = summaryHTML;
+
+        // Add event listener for new video button
+        document.getElementById('newVideoBtn').addEventListener('click', resetUI);
+    }
+
     function formatSceneType(type) {
         // Convert "indoor_small" to "Indoor Small"
         return type
@@ -333,6 +496,14 @@ document.addEventListener('DOMContentLoaded', function () {
         loadingSection.classList.add('hidden');
         resultsSection.classList.add('hidden');
         errorSection.classList.add('hidden');
+
+        // Hide batch results if exists
+        const batchContainer = document.getElementById('batchResults');
+        if (batchContainer) batchContainer.classList.add('hidden');
+
+        // Hide video results if exists
+        const videoContainer = document.getElementById('videoResults');
+        if (videoContainer) videoContainer.classList.add('hidden');
 
         // Reset file input
         fileInput.value = '';
